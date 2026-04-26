@@ -1,0 +1,40 @@
+# Phase 5: MCP Integration and Delivery Requirements
+
+# MCP Protocol
+mcp>=0.2.0
+
+# Google APIs
+google-api-python-client>=2.100.0
+google-auth-httplib2>=0.1.1
+google-auth-oauthlib>=1.1.0
+google-auth>=2.22.0
+
+# FastAPI for MCP servers
+fastapi>=0.104.1
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+
+# Email handling
+aiosmtplib>=3.0.1
+email-validator>=2.1.0
+
+# Template rendering
+jinja2>=3.1.2
+aiofiles>=23.2.1
+
+# Configuration and environment
+python-dotenv>=1.0.0
+pyyaml>=6.0.1
+
+# Async support
+aiohttp>=3.9.1
+asyncio-mqtt>=0.16.1
+
+# Testing
+pytest>=7.4.3
+pytest-asyncio>=0.21.1
+httpx>=0.25.2
+
+# Logging and monitoring
+structlog>=23.2.0
+prometheus-client>=0.19.0

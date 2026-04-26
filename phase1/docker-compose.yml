@@ -1,0 +1,121 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: review_pulse_db
+    environment:
+      POSTGRES_DB: review_pulse
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - review_pulse_network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: review_pulse_redis
+    command: redis-server --appendonly yes
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - review_pulse_network
+
+  # Ingestion Service
+  ingestion_service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: review_pulse_ingestion
+    environment:
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    networks:
+      - review_pulse_network
+    restart: unless-stopped
+
+  # Celery Worker for Background Tasks
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: review_pulse_celery
+    command: celery -A src.tasks worker --loglevel=info
+    environment:
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - review_pulse_network
+    restart: unless-stopped
+
+  # Celery Beat for Scheduled Tasks
+  celery_beat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: review_pulse_beat
+    command: celery -A src.tasks beat --loglevel=info
+    environment:
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./src:/app/src
+      - ./config:/app/config
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - review_pulse_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  review_pulse_network:
+    driver: bridge

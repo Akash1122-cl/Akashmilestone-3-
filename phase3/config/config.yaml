@@ -1,0 +1,200 @@
+# Phase 3 Configuration - Analysis and Clustering
+
+# Database Configuration (inherited from Phase 1)
+database:
+  host: localhost
+  port: 5432
+  database: review_pulse
+  username: postgres
+  password: ${DB_PASSWORD}
+  pool_size: 10
+  max_overflow: 20
+
+# Redis Configuration (inherited from Phase 1)
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  password: ${REDIS_PASSWORD}
+  max_connections: 10
+
+# Clustering Configuration
+clustering:
+  # UMAP parameters
+  umap:
+    n_components: 15
+    n_neighbors: 15
+    min_dist: 0.1
+    metric: cosine
+    random_state: 42
+  
+  # HDBSCAN parameters
+  hdbscan:
+    min_cluster_size: 5
+    min_samples: 3
+    metric: euclidean
+    cluster_selection_method: eom
+    prediction_data: true
+  
+  # Clustering optimization
+  optimization:
+    enabled: true
+    max_iterations: 10
+    target_clusters: [5, 7]
+    stability_threshold: 0.7
+  
+  # Quality metrics
+  quality_metrics:
+    silhouette_score: true
+    davies_bouldin_index: true
+    calinski_harabasz_index: true
+
+# Theme Analyzer Configuration
+theme_analyzer:
+  # LLM Configuration - FREE-ONLY MODE: Disabled by default
+  # Set use_llm to true only if you have free API credits
+  use_llm: false  # When false, uses template-based mock generation (no API costs)
+  llm:
+    model: gpt-4
+    temperature: 0.7
+    max_tokens: 500
+    api_key: ${OPENAI_API_KEY}
+    max_retries: 3
+    retry_delay: 2
+  
+  # Theme generation
+  theme_generation:
+    max_themes: 7
+    min_themes: 5
+    require_action_ideas: true
+    require_quotes: true
+    quotes_per_theme: 3
+  
+  # Prompt templates
+  prompts:
+    theme_naming: |
+      Analyze the following cluster of customer reviews and provide:
+      1. A concise theme name (2-4 words)
+      2. A brief description (1-2 sentences)
+      3. Key insights from the reviews
+      
+      Reviews: {reviews}
+    
+    action_ideas: |
+      Based on the following theme and reviews, generate 3 actionable suggestions for product improvement:
+      
+      Theme: {theme_name}
+      Description: {theme_description}
+      Reviews: {reviews}
+
+# Validation Framework Configuration
+validation:
+  # Quote verification
+  quote_verification:
+    enabled: true
+    fuzzy_match_threshold: 0.85
+    max_quote_length: 200
+  
+  # Theme consistency
+  theme_consistency:
+    enabled: true
+    min_similarity_threshold: 0.6
+    cross_validation: true
+  
+  # Quality scoring
+  quality_scoring:
+    enabled: true
+    weights:
+      quote_accuracy: 0.4
+      theme_coherence: 0.3
+      action_relevance: 0.3
+    min_quality_score: 0.7
+
+# Vector Database Configuration (inherited from Phase 2)
+vector_database:
+  collection_name: review-embeddings
+  dimension: 1536
+  metric: cosine
+  persist_directory: ./chroma_db
+  batch_size: 100
+
+# Cache Manager Configuration
+cache_manager:
+  default_backend: memory
+  redis:
+    enabled: true
+    host: localhost
+    port: 6379
+    db: 2
+    password: ${REDIS_PASSWORD}
+    prefix: phase3:
+  memory:
+    max_size: 500
+    default_ttl: 7200
+
+# Celery Configuration
+celery:
+  broker_url: redis://localhost:6379/2
+  result_backend: redis://localhost:6379/2
+  task_serializer: json
+  accept_content: ['json']
+  result_serializer: json
+  timezone: UTC
+  enable_utc: true
+  task_routes:
+    tasks.cluster_reviews: {'queue': 'clustering'}
+    tasks.analyze_themes: {'queue': 'analysis'}
+    tasks.validate_analysis: {'queue': 'validation'}
+    tasks.complete_analysis_pipeline: {'queue': 'processing'}
+
+# API Configuration
+api:
+  host: 0.0.0.0
+  port: 8002
+  debug: false
+  workers: 4
+  reload: false
+  log_level: INFO
+
+# Logging Configuration
+logging:
+  level: INFO
+  format: json
+  file: logs/phase3.log
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+  handlers:
+    - console
+    - file
+
+# Monitoring Configuration
+monitoring:
+  metrics_enabled: true
+  health_check_interval: 30
+  performance_tracking: true
+  error_tracking: true
+
+# Security Configuration
+security:
+  cors_enabled: true
+  cors_origins:
+    - http://localhost:3000
+    - http://localhost:8080
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+  authentication:
+    enabled: false
+    jwt_secret: ${JWT_SECRET}
+
+# Environment Configuration
+environment: development
+debug: true
+
+# Phase 3 Specific Settings
+phase3:
+  analysis_batch_size: 500
+  clustering_timeout: 300  # 5 minutes
+  llm_timeout: 60  # 1 minute per request
+  validation_timeout: 120  # 2 minutes
+  max_analysis_time: 600  # 10 minutes per product

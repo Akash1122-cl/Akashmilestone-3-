@@ -1,0 +1,156 @@
+# Phase 2 Configuration - Data Processing Pipeline
+
+# Database Configuration (inherited from Phase 1)
+database:
+  host: localhost
+  port: 5432
+  database: review_pulse
+  username: postgres
+  password: ${DB_PASSWORD}
+  pool_size: 10
+  max_overflow: 20
+
+# Redis Configuration (inherited from Phase 1)
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  password: ${REDIS_PASSWORD}
+  max_connections: 10
+
+# Preprocessing Configuration
+preprocessing:
+  target_language: en
+  min_text_length: 10
+  max_text_length: 5000
+  duplicate_threshold: 0.9
+  quality_threshold: 0.3
+
+# Embeddings Configuration
+embeddings:
+  # Free-only mode: Use sentence-transformers (local, no API key needed)
+  # Set use_api to true only if you have free API credits
+  use_api: false  # Disabled for free-only mode
+  api_provider: none  # Options: none, gemini, openai
+  gemini_api_key: ${GEMINI_API_KEY}
+  openai_api_key: ${OPENAI_API_KEY}
+  model: all-MiniLM-L6-v2  # sentence-transformers model (free, local)
+  batch_size: 100
+  max_tokens: 8192
+  dimension: 384  # sentence-transformers dimension
+  cache_enabled: true
+  fallback_enabled: true
+
+# Quality Pipeline Configuration
+quality_pipeline:
+  quality_thresholds:
+    excellent: 0.8
+    good: 0.6
+    acceptable: 0.4
+    poor: 0.2
+  anomaly_thresholds:
+    rating_spike_threshold: 3.0
+    text_length_min: 10
+    text_length_max: 2000
+    sentiment_threshold: 0.8
+    duplicate_similarity_threshold: 0.9
+    spam_keywords_threshold: 0.3
+    bot_pattern_threshold: 0.7
+
+# Vector Database Configuration
+vector_database:
+  # Mode: 'local' or 'cloud'
+  # Free-only mode: use 'local' (no cloud costs)
+  mode: local
+  collection_name: review-embeddings
+  dimension: 1536
+  metric: cosine
+  persist_directory: ./chroma_db
+  batch_size: 100
+  # Chroma Cloud Configuration (only used if mode: cloud)
+  cloud:
+    api_key: ${CHROMA_CLOUD_API_KEY}
+    tenant_id: ${CHROMA_CLOUD_TENANT_ID}
+    host: ${CHROMA_CLOUD_HOST}
+
+# Cache Manager Configuration
+cache_manager:
+  default_backend: memory
+  redis:
+    enabled: true
+    host: localhost
+    port: 6379
+    db: 1
+    password: ${REDIS_PASSWORD}
+    prefix: phase2:
+  memory:
+    max_size: 1000
+    default_ttl: 3600
+
+# Celery Configuration
+celery:
+  broker_url: redis://localhost:6379/1
+  result_backend: redis://localhost:6379/1
+  task_serializer: json
+  accept_content: ['json']
+  result_serializer: json
+  timezone: UTC
+  enable_utc: true
+  task_routes:
+    tasks.preprocess_batch: {'queue': 'preprocessing'}
+    tasks.generate_embeddings_batch: {'queue': 'embeddings'}
+    tasks.quality_analysis_batch: {'queue': 'quality'}
+    tasks.create_vector_index: {'queue': 'vector_db'}
+    tasks.complete_processing_pipeline: {'queue': 'processing'}
+
+# API Configuration
+api:
+  host: 0.0.0.0
+  port: 8001
+  debug: false
+  workers: 4
+  reload: false
+  log_level: INFO
+
+# Logging Configuration
+logging:
+  level: INFO
+  format: json
+  file: logs/phase2.log
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+  handlers:
+    - console
+    - file
+
+# Monitoring Configuration
+monitoring:
+  metrics_enabled: true
+  health_check_interval: 30
+  performance_tracking: true
+  error_tracking: true
+
+# Security Configuration
+security:
+  cors_enabled: true
+  cors_origins:
+    - http://localhost:3000
+    - http://localhost:8080
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+  authentication:
+    enabled: false
+    jwt_secret: ${JWT_SECRET}
+
+# Environment Configuration
+environment: development
+debug: true
+
+# Phase 2 Specific Settings
+phase2:
+  processing_batch_size: 1000
+  embedding_cache_ttl: 86400  # 24 hours
+  quality_check_interval: 21600  # 6 hours
+  vector_index_sync_interval: 3600  # 1 hour
+  max_processing_time: 300  # 5 minutes

@@ -1,0 +1,388 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: review-pulse-production
+  namespace: review-pulse
+  labels:
+    app: review-pulse-production
+    version: v1
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: review-pulse-production
+  template:
+    metadata:
+      labels:
+        app: review-pulse-production
+        version: v1
+    spec:
+      containers:
+      # Phase 1: Data Ingestion
+      - name: phase1
+        image: reviewpulse/review-pulse:latest
+        command: ["python", "src/main.py"]
+        ports:
+        - containerPort: 8000
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: db-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: redis-password
+        - name: ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+        - name: logs
+          mountPath: /app/logs
+
+      # Phase 2: Data Processing
+      - name: phase2
+        image: reviewpulse/review-pulse:latest
+        command: ["python", "src/main.py"]
+        ports:
+        - containerPort: 8001
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: db-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: redis-password
+        - name: ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+        - name: logs
+          mountPath: /app/logs
+        - name: chroma-data
+          mountPath: /app/chroma_db
+
+      # Phase 3: Analysis
+      - name: phase3
+        image: reviewpulse/review-pulse:latest
+        command: ["python", "src/main.py"]
+        ports:
+        - containerPort: 8002
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: db-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: redis-password
+        - name: ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8002
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8002
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+        - name: logs
+          mountPath: /app/logs
+
+      # Phase 4: Report Generation
+      - name: phase4
+        image: reviewpulse/review-pulse:latest
+        command: ["python", "src/main.py"]
+        ports:
+        - containerPort: 8003
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: db-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: redis-password
+        - name: ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8003
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+        - name: templates
+          mountPath: /app/templates
+        - name: logs
+          mountPath: /app/logs
+
+      # Phase 5: MCP Integration
+      - name: phase5
+        image: reviewpulse/review-pulse:latest
+        command: ["python", "src/main.py"]
+        ports:
+        - containerPort: 8005
+        env:
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: db-password
+        - name: REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: redis-password
+        - name: GOOGLE_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: google-client-id
+        - name: GOOGLE_CLIENT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: google-client-secret
+        - name: GOOGLE_REDIRECT_URI
+          value: "https://reviewpulse.yourdomain.com/oauth/callback"
+        - name: DEFAULT_SENDER_EMAIL
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: sender-email
+        - name: OAUTH_STATE_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: oauth-state-secret
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: review-pulse-secrets
+              key: jwt-secret
+        - name: ENVIRONMENT
+          value: "production"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8005
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8005
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+        - name: logs
+          mountPath: /app/logs
+
+      volumes:
+      - name: config
+        configMap:
+          name: review-pulse-config
+      - name: templates
+        configMap:
+          name: review-pulse-templates
+      - name: logs
+        emptyDir: {}
+      - name: chroma-data
+        persistentVolumeClaim:
+          claimName: chroma-data-pvc
+
+      imagePullSecrets:
+      - name: docker-registry-secret
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: review-pulse-production
+  namespace: review-pulse
+  labels:
+    app: review-pulse-production
+spec:
+  type: ClusterIP
+  ports:
+  - name: phase1
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+  - name: phase2
+    port: 8001
+    targetPort: 8001
+    protocol: TCP
+  - name: phase3
+    port: 8002
+    targetPort: 8002
+    protocol: TCP
+  - name: phase4
+    port: 8003
+    targetPort: 8003
+    protocol: TCP
+  - name: phase5
+    port: 8005
+    targetPort: 8005
+    protocol: TCP
+  selector:
+    app: review-pulse-production
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: review-pulse-ingress
+  namespace: review-pulse
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+spec:
+  tls:
+  - hosts:
+    - reviewpulse.yourdomain.com
+    secretName: review-pulse-tls
+  rules:
+  - host: reviewpulse.yourdomain.com
+    http:
+      paths:
+      - path: /api/v1/ingest
+        pathType: Prefix
+        backend:
+          service:
+            name: review-pulse-production
+            port:
+              number: 8000
+      - path: /api/v2
+        pathType: Prefix
+        backend:
+          service:
+            name: review-pulse-production
+            port:
+              number: 8001
+      - path: /api/v3
+        pathType: Prefix
+        backend:
+          service:
+            name: review-pulse-production
+            port:
+              number: 8002
+      - path: /api/v4
+        pathType: Prefix
+        backend:
+          service:
+            name: review-pulse-production
+            port:
+              number: 8003
+      - path: /api/v5
+        pathType: Prefix
+        backend:
+          service:
+            name: review-pulse-production
+            port:
+              number: 8005
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: review-pulse-production
+            port:
+              number: 8003

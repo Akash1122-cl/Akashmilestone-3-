@@ -1,0 +1,21 @@
+# Phase 4 Requirements
+
+# Core dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pyyaml==6.0.1
+
+# Template engine
+jinja2==3.1.2
+
+# LLM
+openai==1.3.7
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+
+# Phase 2 dependencies (inherited)
+redis==5.0.1
+celery==5.3.4

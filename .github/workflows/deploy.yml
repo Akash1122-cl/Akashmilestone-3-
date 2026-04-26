@@ -1,0 +1,222 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+        - staging
+        - production
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v3
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: reviewpulse/review-pulse
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=semver,pattern={{version}}
+          type=semver,pattern={{major}}.{{minor}}
+          type=sha,prefix={{branch}}-
+    
+    - name: Build and push Docker image
+      id: build
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        platforms: linux/amd64,linux/arm64
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    environment: staging
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_STAGING }}
+    
+    - name: Deploy to staging
+      run: |
+        # Update image tag in deployment
+        sed -i "s|image: reviewpulse/review-pulse:.*|image: ${{ needs.build-and-push.outputs.image-tag }}|" k8s/staging/deployment.yaml
+        
+        # Apply Kubernetes manifests
+        kubectl apply -f k8s/staging/
+        
+        # Wait for deployment
+        kubectl rollout status deployment/review-pulse-staging --timeout=300s
+    
+    - name: Verify deployment
+      run: |
+        # Check pod status
+        kubectl get pods -l app=review-pulse-staging
+        
+        # Check service health
+        kubectl port-forward svc/review-pulse-staging 8080:80 &
+        sleep 10
+        curl -f http://localhost:8080/health || exit 1
+    
+    - name: Run smoke tests
+      run: |
+        # Install test dependencies
+        pip install requests pytest
+        
+        # Run smoke tests
+        python -m pytest tests/smoke/staging.py -v
+
+  deploy-production:
+    runs-on: ubuntu-latest
+    needs: [build-and-push, deploy-staging]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v') || github.event.inputs.environment == 'production'
+    environment: production
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+    
+    - name: Create backup
+      run: |
+        # Create database backup before deployment
+        kubectl exec -it deployment/postgres-production -- pg_dump -U postgres review_pulse > backup-$(date +%Y%m%d-%H%M%S).sql
+        
+        # Upload backup to storage
+        aws s3 cp backup-*.sql s3://review-pulse-backups/production/
+    
+    - name: Deploy to production
+      run: |
+        # Update image tag
+        sed -i "s|image: reviewpulse/review-pulse:.*|image: ${{ needs.build-and-push.outputs.image-tag }}|g" k8s/production/deployment.yaml
+        
+        # Apply manifests with zero downtime
+        kubectl apply -f k8s/production/
+        
+        # Wait for rollout
+        kubectl rollout status deployment/review-pulse-production --timeout=600s
+    
+    - name: Verify production deployment
+      run: |
+        # Check all pods are ready
+        kubectl wait --for=condition=ready pod -l app=review-pulse-production --timeout=300s
+        
+        # Check service endpoints
+        kubectl get svc review-pulse-production
+        
+        # Health check
+        kubectl port-forward svc/review-pulse-production 8080:80 &
+        sleep 15
+        curl -f http://localhost:8080/health || exit 1
+    
+    - name: Run production smoke tests
+      run: |
+        python -m pytest tests/smoke/production.py -v
+    
+    - name: Notify team
+      uses: 8398a7/action-slack@v3
+      with:
+        status: ${{ job.status }}
+        channel: '#deployments'
+        text: '🚀 Review Pulse deployed to production!'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  rollback:
+    runs-on: ubuntu-latest
+    needs: deploy-production
+    if: failure() && github.ref == 'refs/heads/main'
+    environment: production
+    
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+    
+    - name: Configure kubectl
+      uses: azure/k8s-set-context@v3
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBE_CONFIG_PRODUCTION }}
+    
+    - name: Rollback deployment
+      run: |
+        # Rollback to previous revision
+        kubectl rollout undo deployment/review-pulse-production
+        
+        # Wait for rollback
+        kubectl rollout status deployment/review-pulse-production --timeout=300s
+    
+    - name: Verify rollback
+      run: |
+        kubectl get pods -l app=review-pulse-production
+        kubectl port-forward svc/review-pulse-production 8080:80 &
+        sleep 10
+        curl -f http://localhost:8080/health || exit 1
+    
+    - name: Notify rollback
+      uses: 8398a7/action-slack@v3
+      with:
+        status: 'failure'
+        channel: '#deployments'
+        text: '🔄 Review Pulse production deployment rolled back!'
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+    - name: Run Trivy on Docker image
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ needs.build-and-push.outputs.image-tag }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      with:
+        sarif_file: 'trivy-results.sarif'

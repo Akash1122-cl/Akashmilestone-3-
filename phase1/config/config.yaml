@@ -1,0 +1,80 @@
+# Phase 1 Configuration
+# Data Ingestion Foundation
+
+# Database Configuration
+database:
+  host: localhost
+  port: 5432
+  name: review_pulse
+  user: postgres
+  password: ${DB_PASSWORD}
+  pool_size: 10
+  max_overflow: 20
+
+# Redis Configuration
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  password: ${REDIS_PASSWORD}
+  max_connections: 50
+
+# App Store Configuration
+app_store:
+  rss_feed_url_template: "https://itunes.apple.com/rss/customerreviews/page={page}/id={app_id}/sortby=mostrecent/xml"
+  max_pages: 10
+  reviews_per_page: 50
+  request_timeout: 30
+  retry_attempts: 3
+  retry_delay: 5
+
+# Google Play Configuration
+google_play:
+  max_reviews: 1000
+  request_timeout: 30
+  retry_attempts: 3
+  retry_delay: 5
+  proxy_rotation: true
+  proxy_list:
+    - ${PROXY_1}
+    - ${PROXY_2}
+    - ${PROXY_3}
+  user_agents:
+    - "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    - "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
+    - "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
+
+# Products Configuration
+products:
+  - name: "Groww"
+    app_store_id: "987654321"
+    play_store_url: "https://play.google.com/store/apps/details?id=com.groww"
+    enabled: true
+    sources:
+      app_store: false  # Disabled - only fetch Google Play data
+      google_play: true  # Enabled
+
+# Ingestion Configuration
+ingestion:
+  batch_size: 1000
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  time_window_days: 56  # 8 weeks
+  deduplication_enabled: true
+  language_filter: true
+  target_language: "en"
+  effective_reviews_only: true  # Google Play: Effective reviews only
+
+# Logging Configuration
+logging:
+  level: INFO
+  format: json
+  file: logs/ingestion.log
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+
+# API Configuration
+api:
+  host: 0.0.0.0
+  port: 8000
+  debug: false
+  workers: 4

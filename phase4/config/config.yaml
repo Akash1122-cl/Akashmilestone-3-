@@ -1,0 +1,204 @@
+# Phase 4 Configuration - Report Generation
+
+# Database Configuration (inherited from Phase 1)
+database:
+  host: localhost
+  port: 5432
+  database: review_pulse
+  username: postgres
+  password: ${DB_PASSWORD}
+  pool_size: 10
+  max_overflow: 20
+
+# Redis Configuration (inherited from Phase 1)
+redis:
+  host: localhost
+  port: 6379
+  db: 0
+  password: ${REDIS_PASSWORD}
+  max_connections: 10
+
+# Narrative Builder Configuration
+narrative_builder:
+  # Template engine settings
+  template_engine: jinja2
+  template_directory: ./templates
+  
+  # Content selection
+  max_themes: 7
+  min_themes: 5
+  max_quotes_per_theme: 3
+  max_action_ideas: 3
+  
+  # LLM configuration for executive summary - FREE-ONLY MODE: Disabled by default
+  # Set use_llm to true only if you have free API credits
+  use_llm: false  # When false, uses template-based executive summaries (no API costs)
+  llm:
+    model: gpt-4
+    temperature: 0.7
+    max_tokens: 500
+    api_key: ${OPENAI_API_KEY}
+    max_retries: 3
+    retry_delay: 2
+  
+  # Prompt templates
+  prompts:
+    executive_summary: |
+      Based on the following themes and analysis, generate a concise executive summary (2-3 sentences) for a weekly product review report:
+      
+      Product: {product_name}
+      Total Reviews: {total_reviews}
+      Themes: {themes_summary}
+      
+      Executive Summary:
+    
+    quote_ranking: |
+      Rank the following quotes by their representativeness and impact for the theme "{theme_name}":
+      {quotes}
+      
+      Return the top {max_quotes} quotes.
+
+# Report Formatter Configuration
+report_formatter:
+  # Output formats
+  output_formats:
+    - html
+    - markdown
+    - pdf
+  
+  # Layout settings
+  layout:
+    max_pages: 1
+    font_family: Arial
+    font_size: 11
+    line_height: 1.5
+    margin: 0.5in
+  
+  # Section ordering
+  sections:
+    - executive_summary
+    - themes
+    - quotes
+    - action_ideas
+    - impact_analysis
+  
+  # Branding
+  branding:
+    company_name: "Review Pulse"
+    logo_url: ""
+    primary_color: "#2563eb"
+    secondary_color: "#64748b"
+
+# Quality Assurance Configuration
+quality_assurance:
+  # Content validation
+  content_validation:
+    min_themes: 3
+    max_themes: 7
+    min_quotes_per_theme: 2
+    max_quotes_per_theme: 3
+    min_action_ideas: 2
+    max_action_ideas: 3
+  
+  # Format validation
+  format_validation:
+    max_page_length: 1000  # characters
+    min_section_length: 50
+    required_sections:
+      - executive_summary
+      - themes
+      - quotes
+      - action_ideas
+  
+  # Readability scoring
+  readability:
+    min_readability_score: 0.6
+    max_sentence_length: 25
+    max_paragraph_length: 150
+  
+  # Completeness check
+  completeness:
+    require_executive_summary: true
+    require_themes: true
+    require_quotes: true
+    require_action_ideas: true
+
+# Cache Manager Configuration
+cache_manager:
+  default_backend: memory
+  redis:
+    enabled: true
+    host: localhost
+    port: 6379
+    db: 3
+    password: ${REDIS_PASSWORD}
+    prefix: phase4:
+  memory:
+    max_size: 200
+    default_ttl: 3600
+
+# Celery Configuration
+celery:
+  broker_url: redis://localhost:6379/3
+  result_backend: redis://localhost:6379/3
+  task_serializer: json
+  accept_content: ['json']
+  result_serializer: json
+  timezone: UTC
+  enable_utc: true
+  task_routes:
+    tasks.generate_report: {'queue': 'reporting'}
+    tasks.format_report: {'queue': 'formatting'}
+    tasks.validate_report: {'queue': 'quality'}
+    tasks.complete_report_pipeline: {'queue': 'processing'}
+
+# API Configuration
+api:
+  host: 0.0.0.0
+  port: 8003
+  debug: false
+  workers: 4
+  reload: false
+  log_level: INFO
+
+# Logging Configuration
+logging:
+  level: INFO
+  format: json
+  file: logs/phase4.log
+  max_bytes: 10485760  # 10MB
+  backup_count: 5
+  handlers:
+    - console
+    - file
+
+# Monitoring Configuration
+monitoring:
+  metrics_enabled: true
+  health_check_interval: 30
+  performance_tracking: true
+  error_tracking: true
+
+# Security Configuration
+security:
+  cors_enabled: true
+  cors_origins:
+    - http://localhost:3000
+    - http://localhost:8080
+  rate_limiting:
+    enabled: true
+    requests_per_minute: 100
+  authentication:
+    enabled: false
+    jwt_secret: ${JWT_SECRET}
+
+# Environment Configuration
+environment: development
+debug: true
+
+# Phase 4 Specific Settings
+phase4:
+  report_generation_timeout: 60  # 1 minute
+  formatting_timeout: 30  # 30 seconds
+  validation_timeout: 30  # 30 seconds
+  max_report_generation_time: 120  # 2 minutes
