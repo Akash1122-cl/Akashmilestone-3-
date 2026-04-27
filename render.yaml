@@ -1,0 +1,36 @@
+services:
+  # Main Backend Service
+  - type: web
+    name: review-pulse-backend
+    runtime: docker
+    plan: free
+    dockerContext: .
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: review-pulse-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: review-pulse-cache
+          property: connectionString
+      - key: MCP_SERVER_URL
+        value: https://saksham-mcp-server.onrender.com
+      - key: PORT
+        value: 8006
+
+databases:
+  - name: review-pulse-db
+    plan: free
+
+kvStores:
+  - type: redis
+    name: review-pulse-cache
+    plan: free
