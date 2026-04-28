@@ -1,18 +1,14 @@
 import React from 'react'
 import { MetricCard } from '@/components/ui/MetricCard'
-import { RecentReviews } from '@/components/dashboard/RecentReviews'
-import { SentimentChart } from '@/components/charts/SentimentChart'
-import { ThemeDistribution } from '@/components/charts/ThemeDistribution'
-import { SystemHealth } from '@/components/dashboard/SystemHealth'
 
 export const Dashboard: React.FC = () => {
   return (
-    <div className="p-6 space-y-6">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">
-            Dashboard
+            Review Pulse Dashboard
           </h1>
           <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             Overview of your review analytics and system status
@@ -60,19 +56,22 @@ export const Dashboard: React.FC = () => {
         />
       </div>
 
-      {/* Charts Row */}
+      {/* Coming Soon placeholder */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SentimentChart />
-        <ThemeDistribution />
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm flex items-center justify-center h-48">
+          <p className="text-gray-400 dark:text-gray-500 text-sm">Sentiment Chart - Coming Soon</p>
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm flex items-center justify-center h-48">
+          <p className="text-gray-400 dark:text-gray-500 text-sm">Theme Distribution - Coming Soon</p>
+        </div>
       </div>
 
-      {/* Bottom Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <RecentReviews />
+        <div className="lg:col-span-2 bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm flex items-center justify-center h-48">
+          <p className="text-gray-400 dark:text-gray-500 text-sm">Recent Reviews - Coming Soon</p>
         </div>
-        <div>
-          <SystemHealth />
+        <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm flex items-center justify-center h-48">
+          <p className="text-gray-400 dark:text-gray-500 text-sm">System Health - Coming Soon</p>
         </div>
       </div>
     </div>
