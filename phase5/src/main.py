@@ -15,6 +15,7 @@ from pydantic import BaseModel, EmailStr
 import uvicorn
 
 from delivery_service import DeliveryService, DeliveryRequest, create_delivery_service
+from delivery_service_external import ExternalDeliveryService, DeliveryRequest as ExternalDeliveryRequest, create_external_delivery_service
 from stakeholder_manager import Stakeholder, DeliveryFrequency, create_stakeholder_manager
 from docs_mcp_server import create_docs_mcp_server
 from gmail_mcp_server import create_gmail_mcp_server
@@ -35,6 +36,8 @@ class DeliveryRequestModel(BaseModel):
     subject: Optional[str] = None
     attachments: Optional[List[Dict[str, Any]]] = None
     custom_recipients: Optional[List[EmailStr]] = None
+    doc_id: Optional[str] = None  # For external MCP server
+    use_external_mcp: Optional[bool] = False  # Use external MCP server
 
 
 class StakeholderModel(BaseModel):
@@ -60,12 +63,13 @@ class DeliveryRuleModel(BaseModel):
 
 # Global variables
 delivery_service: Optional[DeliveryService] = None
+external_delivery_service: Optional[ExternalDeliveryService] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Manage application lifecycle"""
-    global delivery_service
+    global delivery_service, external_delivery_service
     
     # Load configuration
     import os
@@ -83,12 +87,23 @@ async def lifespan(app: FastAPI):
         'token_encryption_key': os.getenv('TOKEN_ENCRYPTION_KEY'),
         'jwt_secret': os.getenv('JWT_SECRET'),
         'environment': os.getenv('ENVIRONMENT', 'development'),
-        'debug': os.getenv('DEBUG', 'false').lower() == 'true'
+        'debug': os.getenv('DEBUG', 'false').lower() == 'true',
+        'mcp_url': os.getenv('MCP_SERVER_URL', 'https://saksham-mcp-server.onrender.com')
     }
     
-    # Initialize delivery service
-    delivery_service = create_delivery_service(config)
-    logger.info("Phase 5 MCP Delivery Service initialized")
+    # Initialize internal delivery service (original implementation)
+    try:
+        delivery_service = create_delivery_service(config)
+        logger.info("Phase 5 Internal MCP Delivery Service initialized")
+    except Exception as e:
+        logger.warning(f"Failed to initialize internal delivery service: {e}")
+    
+    # Initialize external delivery service (Saksham's MCP server)
+    try:
+        external_delivery_service = create_external_delivery_service(config)
+        logger.info("Phase 5 External MCP Delivery Service initialized")
+    except Exception as e:
+        logger.warning(f"Failed to initialize external delivery service: {e}")
     
     yield
     
@@ -171,50 +186,129 @@ async def oauth_callback(request: Request):
 @app.post("/api/v1/deliver-report")
 async def deliver_report(request: DeliveryRequestModel):
     """Deliver report to stakeholders"""
-    if not delivery_service:
-        raise HTTPException(status_code=503, detail="Service not initialized")
     
-    try:
-        delivery_request = DeliveryRequest(
-            product_id=request.product_id,
-            report_content=request.report_content,
-            report_format=request.report_format,
-            subject=request.subject,
-            attachments=request.attachments,
-            custom_recipients=request.custom_recipients
-        )
+    # Choose service based on request
+    use_external = request.use_external_mcp or os.getenv('USE_EXTERNAL_MCP', 'false').lower() == 'true'
+    
+    if use_external:
+        # Use external MCP service
+        if not external_delivery_service:
+            raise HTTPException(status_code=503, detail="External MCP service not initialized")
         
-        result = await delivery_service.deliver_report(delivery_request)
-        
-        return {
-            "success": True,
-            "result": {
-                "product_id": result.product_id,
-                "total_recipients": result.total_recipients,
-                "successful_deliveries": result.successful_deliveries,
-                "failed_deliveries": result.failed_deliveries,
-                "document_id": result.document_id,
-                "timestamp": result.timestamp.isoformat()
+        try:
+            external_request = ExternalDeliveryRequest(
+                product_id=request.product_id,
+                report_content=request.report_content,
+                report_format=request.report_format,
+                subject=request.subject,
+                attachments=request.attachments,
+                custom_recipients=request.custom_recipients,
+                doc_id=request.doc_id
+            )
+            
+            result = await external_delivery_service.deliver_report(external_request)
+            
+            return {
+                "success": True,
+                "service": "external_mcp",
+                "result": {
+                    "product_id": result.product_id,
+                    "total_recipients": result.total_recipients,
+                    "successful_deliveries": result.successful_deliveries,
+                    "failed_deliveries": result.failed_deliveries,
+                    "document_id": result.document_id,
+                    "email_drafts": result.email_drafts,
+                    "errors": result.errors,
+                    "timestamp": result.timestamp.isoformat()
+                }
             }
-        }
+            
+        except Exception as e:
+            logger.error(f"External MCP delivery error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+    
+    else:
+        # Use internal MCP service
+        if not delivery_service:
+            raise HTTPException(status_code=503, detail="Internal MCP service not initialized")
         
-    except Exception as e:
-        logger.error(f"Report delivery error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        try:
+            delivery_request = DeliveryRequest(
+                product_id=request.product_id,
+                report_content=request.report_content,
+                report_format=request.report_format,
+                subject=request.subject,
+                attachments=request.attachments,
+                custom_recipients=request.custom_recipients
+            )
+            
+            result = await delivery_service.deliver_report(delivery_request)
+            
+            return {
+                "success": True,
+                "service": "internal_mcp",
+                "result": {
+                    "product_id": result.product_id,
+                    "total_recipients": result.total_recipients,
+                    "successful_deliveries": result.successful_deliveries,
+                    "failed_deliveries": result.failed_deliveries,
+                    "document_id": result.document_id,
+                    "timestamp": result.timestamp.isoformat()
+                }
+            }
+            
+        except Exception as e:
+            logger.error(f"Internal MCP delivery error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
+
+@app.get("/api/v1/mcp-status")
+async def get_mcp_status():
+    """Get status of both MCP services"""
+    status = {
+        "internal_mcp": {
+            "available": delivery_service is not None,
+            "status": "healthy" if delivery_service else "not_initialized"
+        },
+        "external_mcp": {
+            "available": external_delivery_service is not None,
+            "status": "healthy" if external_delivery_service else "not_initialized"
+        }
+    }
+    
+    # Get external MCP server details if available
+    if external_delivery_service:
+        try:
+            external_status = await external_delivery_service.mcp_service.get_mcp_status()
+            status["external_mcp"]["details"] = external_status
+        except Exception as e:
+            status["external_mcp"]["error"] = str(e)
+    
+    return status
 
 @app.get("/api/v1/delivery-status/{product_id}")
 async def get_delivery_status(product_id: str):
     """Get delivery status for a product"""
-    if not delivery_service:
-        raise HTTPException(status_code=503, detail="Service not initialized")
     
-    try:
-        status = await delivery_service.get_delivery_status(product_id)
-        return status
-    except Exception as e:
-        logger.error(f"Delivery status error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # Try external service first
+    if external_delivery_service:
+        try:
+            status = await external_delivery_service.get_delivery_status(product_id)
+            status["service"] = "external_mcp"
+            return status
+        except Exception as e:
+            logger.warning(f"External MCP status check failed: {e}")
+    
+    # Fallback to internal service
+    if delivery_service:
+        try:
+            status = await delivery_service.get_delivery_status(product_id)
+            status["service"] = "internal_mcp"
+            return status
+        except Exception as e:
+            logger.error(f"Internal MCP status check failed: {e}")
+    
+    raise HTTPException(status_code=503, detail="No MCP service available")
 
 
 @app.post("/api/v1/retry-delivery/{product_id}")

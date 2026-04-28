@@ -14,6 +14,8 @@ from docs_mcp_server import DocsMCPServer, create_docs_mcp_server
 from gmail_mcp_server import GmailMCPServer, create_gmail_mcp_server
 from stakeholder_manager import StakeholderManager, DeliveryStatus, create_stakeholder_manager
 
+logger = logging.getLogger(__name__)
+
 
 @dataclass
 class DeliveryRequest:

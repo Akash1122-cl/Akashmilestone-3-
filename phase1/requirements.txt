@@ -2,44 +2,44 @@
 # Python dependencies
 
 # Database
-psycopg2-binary==2.9.9
-SQLAlchemy==2.0.23
-alembic==1.12.1
+psycopg2-binary
+SQLAlchemy
+alembic
 
 # RSS Feed Parsing
-feedparser==6.0.10
+feedparser
 
 # Web Scraping
-scrapy==2.11.0
-play-scraper==1.2.0
-requests==2.31.0
-beautifulsoup4==4.12.2
-selenium==4.15.2
+scrapy
+play-scraper
+requests
+beautifulsoup4
+selenium
 
 # Caching
-redis==5.0.1
+redis
 
 # Configuration
-pyyaml==6.0.1
-python-dotenv==1.0.0
+pyyaml
+python-dotenv
 
 # Web Framework
-fastapi==0.104.1
-uvicorn==0.24.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
+fastapi
+uvicorn
+pydantic
+pydantic-settings
 
 # Task Queue
-celery==5.3.4
+celery
 
 # Logging
-python-json-logger==2.0.7
+python-json-logger
 
 # Testing
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
+pytest
+pytest-asyncio
+pytest-cov
 
 # Utilities
-python-dateutil==2.8.2
-tqdm==4.66.1
+python-dateutil
+tqdm

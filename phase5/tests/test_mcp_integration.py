@@ -269,8 +269,12 @@ class TestGmailMCPServer:
     def test_add_attachment(self, gmail_server):
         """Test adding attachments to email"""
         from email.mime.multipart import MIMEMultipart
+        from email.mime.text import MIMEText
         
+        # Create message with body first
         msg = MIMEMultipart()
+        msg.attach(MIMEText('Test email body', 'plain'))
+        
         attachment = {
             'filename': 'test.txt',
             'content': 'Test file content',
@@ -279,7 +283,8 @@ class TestGmailMCPServer:
         
         gmail_server._add_attachment(msg, attachment)
         
-        assert len(msg.get_payload()) > 1
+        # Should now have 2 parts: body + attachment
+        assert len(msg.get_payload()) == 2
 
 
 class TestStakeholderManager:

@@ -9,7 +9,8 @@ import asyncio
 from dotenv import load_dotenv
 
 # Add src to path
-sys.path.append('src')
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(current_dir, 'src'))
 
 # Load test environment
 load_dotenv('.env.example')

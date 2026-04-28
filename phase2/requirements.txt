@@ -1,39 +1,39 @@
 # Phase 2 Requirements
 
 # Core dependencies
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-pyyaml==6.0.1
+fastapi
+uvicorn[standard]
+pydantic
+pyyaml
 
 # Data processing
-pandas==2.1.3
-numpy==1.26.2
+pandas
+numpy
 
 # NLP
-nltk==3.8.1
-spacy==3.7.2
-langdetect==1.0.9
+nltk
+spacy
+langdetect
 
 # Google Gemini
-google-generativeai==0.3.2
+google-generativeai
 
 # OpenAI (fallback)
-openai==1.3.7
+openai
 
 # Vector database
-chromadb==0.4.18
+chromadb
 
 # Database
-psycopg2-binary==2.9.9
-sqlalchemy==2.0.23
+psycopg2-binary
+sqlalchemy
 
 # Caching
-redis==5.0.1
+redis
 
 # Task queue
-celery==5.3.4
+celery
 
 # Testing
-pytest==7.4.3
-pytest-cov==4.1.0
+pytest
+pytest-cov
