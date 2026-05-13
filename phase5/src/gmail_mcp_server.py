@@ -19,6 +19,7 @@ from googleapiclient.discovery import build
 
 from mcp_base import MCPServerBase, MCPError
 
+logger = logging.getLogger(__name__)
 
 @dataclass
 class EmailRequest:

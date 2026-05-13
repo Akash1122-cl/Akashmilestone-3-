@@ -5,6 +5,7 @@ Coordinates Docs MCP server, Gmail MCP server, and stakeholder management
 
 import logging
 import asyncio
+import os
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from contextlib import asynccontextmanager

@@ -198,3 +198,5 @@ yarn-debug.log*
 yarn-error.log*
 .eslintcache
 .stylelintcache
+
+.vercel
