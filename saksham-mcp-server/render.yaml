@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: saksham-mcp-server
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: AUTO_APPROVE
+        value: "true"
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false
+      - key: GOOGLE_TOKEN_JSON
+        sync: false
