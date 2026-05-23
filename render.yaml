@@ -22,7 +22,7 @@ services:
           name: review-pulse-cache
           property: connectionString
       - key: MCP_SERVER_URL
-        value: https://saksham-mcp-server.onrender.com
+        value: https://mcp-c38g.onrender.com
       - key: PORT
         value: 8006
 
