@@ -53,9 +53,9 @@ Component: ReviewPreprocessor
 #### 2.2 Embedding Generation
 ```
 Component: EmbeddingService
-- Model: OpenAI text-embedding-3-small or sentence-transformers
+- Model: sentence-transformers (all-MiniLM-L6-v2)
 - Batch processing: 1000 reviews per batch
-- Storage: Vector database (Pinecone/Weaviate)
+- Storage: Vector database (Local ChromaDB)
 - Caching: Redis for frequently accessed embeddings
 ```
 
@@ -165,7 +165,7 @@ graph TD
 - **Language**: Python 3.11+
 - **Web Framework**: FastAPI for API endpoints
 - **Task Queue**: Celery with Redis
-- **Database**: PostgreSQL (relational) + Pinecone (vector)
+- **Database**: PostgreSQL (relational) + ChromaDB (vector)
 - **Caching**: Redis
 - **ML Libraries**: scikit-learn, umap-learn, hdbscan, sentence-transformers
 
@@ -177,8 +177,8 @@ graph TD
 - **CI/CD**: GitHub Actions
 
 ### External Services
-- **LLM**: OpenAI GPT-4 API
-- **Embeddings**: OpenAI text-embedding-3-small
+- **LLM**: OpenAI GPT-4 API (Optional/Template-based fallback)
+- **Embeddings**: sentence-transformers (local)
 - **Google Workspace**: Google APIs via MCP
 - **Proxy Service**: Rotating proxy provider for scraping
 
@@ -210,7 +210,7 @@ docker-compose.dev.yml
 Kubernetes Cluster
 - 3x PostgreSQL replicas (primary + read replicas)
 - Redis Cluster for caching
-- Vector database (Pinecone managed service)
+- Vector database (ChromaDB managed service or stateful set)
 - Multiple service replicas for scalability
 - Load balancer + ingress controller
 ```

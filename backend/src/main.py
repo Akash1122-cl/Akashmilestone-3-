@@ -255,6 +255,10 @@ async def general_exception_handler(request: Request, exc: Exception):
 if __name__ == "__main__":
     import uvicorn
     import os
+    import sys
+    
+    # Add parent directory to python path for 'src.' imports to work if executed directly
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
     
     port = int(os.getenv("PORT", 9000))
     host = os.getenv("HOST", "0.0.0.0")
@@ -263,7 +267,7 @@ if __name__ == "__main__":
     logger.info("Starting development server", host=host, port=port, debug=debug)
     
     uvicorn.run(
-        "main:app",
+        "src.main:app",
         host=host,
         port=port,
         reload=debug,
